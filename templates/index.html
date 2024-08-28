@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transcripción y Análisis de Audio</title>
+</head>
+<body>
+    <h1>Sube un archivo de audio para transcribir y analizar</h1>
+    <form method="POST" enctype="multipart/form-data">
+        <input type="file" name="file" accept="audio/*">
+        <input type="submit" value="Subir y Analizar">
+    </form>
+
+    {% if transcription %}
+        <h2>Transcripción:</h2>
+        <p>{{ transcription }}</p>
+
+        <h2>Análisis:</h2>
+        <p>{{ analysis }}</p>
+    {% endif %}
+</body>
+</html>
