@@ -1,28 +1,27 @@
 import os
-from flask import Flask, request, render_template, redirect, url_for
-import speech_recognition as sr
-import openai
+from flask import Flask, request, render_template, redirect, url_for, flash
 from dotenv import load_dotenv
+from services.transcription_service import transcribe_audio
+from services.analysis_service import analyze_transcription
 
 # Cargar las variables desde el archivo .env
 load_dotenv()
 
-# Ahora puedes acceder a la API key como una variable de entorno
-openai.api_key = os.getenv('OPENAI_API_KEY')
-
-
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
+app.secret_key = 'tu_clave_secreta'  # Necesaria para mensajes flash
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
         if 'file' not in request.files:
+            flash('No se ha seleccionado ningún archivo', 'error')
             return redirect(request.url)
 
         file = request.files['file']
 
         if file.filename == '':
+            flash('No se ha seleccionado ningún archivo', 'error')
             return redirect(request.url)
 
         if file:
@@ -30,37 +29,17 @@ def index():
             file.save(filepath)
 
             transcription = transcribe_audio(filepath)
+            if not transcription:
+                flash('Hubo un problema al transcribir el archivo', 'error')
+                return redirect(request.url)
+
             analysis = analyze_transcription(transcription)
 
             return render_template('index.html', transcription=transcription, analysis=analysis)
 
     return render_template('index.html')
 
-def transcribe_audio(filepath):
-    recognizer = sr.Recognizer()
-    with sr.AudioFile(filepath) as source:
-        audio = recognizer.record(source)
-
-    try:
-        text = recognizer.recognize_google(audio, language='es-ES')
-        return text
-    except sr.UnknownValueError:
-        return "No se pudo entender el audio"
-    except sr.RequestError as e:
-        return f"Error en el servicio de reconocimiento de voz; {e}"
-
-def analyze_transcription(transcription):
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": f"Evalúa el siguiente texto:\n\n{transcription}\n\nProporciona un resumen y una evaluación general."}
-        ]
-    )
-    return response.choices[0].message['content']
-
 if __name__ == '__main__':
     if not os.path.exists(app.config['UPLOAD_FOLDER']):
         os.makedirs(app.config['UPLOAD_FOLDER'])
     app.run(debug=True)
-
