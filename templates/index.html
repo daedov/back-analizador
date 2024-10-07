@@ -11,12 +11,12 @@
 <body>
     <div class="min-h-screen flex items-center justify-center bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
         <div class="max-w-4xl w-full bg-white p-12 rounded-lg shadow-md">
-            <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">Sube un archivo de audio para transcribir y analizar</h1>
+            <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">Sube archivos de audio para transcribir y analizar</h1>
 
             <form method="POST" enctype="multipart/form-data" class="space-y-8">
                 <div>
-                    <label class="block text-lg font-medium text-gray-700" for="file">Archivo de audio</label>
-                    <input type="file" name="file" accept="audio/*"
+                    <label class="block text-lg font-medium text-gray-700" for="file">Archivos de audio</label>
+                    <input type="file" name="files" accept="audio/*" multiple
                         class="mt-2 block w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-lg">
                 </div>
                 <div>
@@ -25,15 +25,16 @@
                 </div>
             </form>
 
-            {% if transcription %}
+            {% if results %}
             <div class="mt-8">
-                <h2 class="text-2xl font-semibold text-gray-800">Transcripción:</h2>
-                <p class="mt-4 text-gray-700">{{ transcription }}</p>
-            </div>
-
-            <div class="mt-8">
-                <h2 class="text-2xl font-semibold text-gray-800">Análisis:</h2>
-                <div class="mt-4 text-gray-700">{{ analysis | safe }}</div>
+                {% for result in results %}
+                <div class="mt-8">
+                    <h2 class="text-2xl font-semibold text-gray-800">Transcripción del archivo {{ result.filename }}:</h2>
+                    <p class="mt-4 text-gray-700">{{ result.transcription }}</p>
+                    <h3 class="text-2xl font-semibold text-gray-800 mt-4">Análisis:</h3>
+                    <div class="mt-4 text-gray-700">{{ result.analysis | safe }}</div>
+                </div>
+                {% endfor %}
             </div>
             {% endif %}
         </div>
