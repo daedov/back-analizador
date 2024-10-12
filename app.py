@@ -13,7 +13,10 @@ app.config['UPLOAD_FOLDER'] = 'uploads'
 app.secret_key = 'tu_clave_secreta'  # Necesaria para mensajes flash
 
 # Configuración de la base de datos usando MariaDB
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:123456@localhost/transcriptions_db'
+app.config['SQLALCHEMY_DATABASE_URI'] = (
+    f"mysql+pymysql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}"
+    f"@{os.getenv('DB_HOST')}/{os.getenv('DB_NAME')}"
+)
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
