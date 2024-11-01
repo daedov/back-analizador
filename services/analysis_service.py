@@ -15,7 +15,7 @@ def analyze_transcription(transcription):
             "Verifica si el agente se despide adecuadamente y pregunta si el cliente necesita algo más antes de finalizar la conversación, basado en la parte final de la transcripción de la siguiente grabación de una llamada telefónica. Ejemplos de una despedida adecuada incluyen: '¿Hay algo más en lo que pueda ayudarle antes de finalizar?' o 'Gracias por su tiempo, si necesita algo más, estamos aquí para ayudar'. También considera que si el cliente muestra prisa por finalizar la llamada, el agente podría no tener la oportunidad de preguntar, lo cual es aceptable. Responde si es Positivo o Negativo y proporciona la razón con un fragmento de la conversación como ejemplo:"
         ]
         analysis_results = []
-        total_tokens_used = 0
+
         for prompt in prompts:
             response = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
@@ -24,21 +24,11 @@ def analyze_transcription(transcription):
                     {"role": "user", "content": f"{prompt}\n\n{transcription}"}
                 ]
             )
-            analysis_results.append(response.choices[0].message['content'])
-            total_tokens_used += response['usage']['total_tokens']
-        
-        # Formatear el resultado en una tabla HTML con columna de evaluación
-        analysis_table = f"""
-        <table class="table-auto w-full mt-4">
-            <thead>
-                <tr>
-                    <th class="border px-4 py-2">Aspecto Evaluado</th>
-                    <th class="border px-4 py-2">Resultado</th>
-                    <th class="border px-4 py-2">Evaluación</th>
-                </tr>
-            </thead>
-            <tbody>
-        """
+            # Agrega los resultados y tokens utilizados
+            result_content = response.choices[0].message['content']
+            analysis_results.append(result_content)
+
+        # Devolver los datos como un array de objetos
         aspects = [
             "Saludo y Presentación (Inicio de la conversación)",
             "Pregunta para ayudar al cliente (Durante la conversación)",
@@ -46,20 +36,21 @@ def analyze_transcription(transcription):
             "Demostración de seguridad (Durante la conversación)",
             "Despedida y oferta de ayuda adicional (Final de la conversación)"
         ]
+
+        structured_results = []
         for aspect, result in zip(aspects, analysis_results):
-            # Dividir el resultado en positivo/negativo y la razón proporcionada
+            # Divide el resultado en positivo/negativo y la razón proporcionada
             lines = result.split("\n", 1)
             evaluation = lines[0] if len(lines) > 0 else "No evaluado"
             reason = lines[1] if len(lines) > 1 else "Sin razón proporcionada"
-            analysis_table += f"""
-                <tr>
-                    <td class="border px-4 py-2">{aspect}</td>
-                    <td class="border px-4 py-2">{reason}</td>
-                    <td class="border px-4 py-2">{evaluation}</td>
-                </tr>
-            """
-        analysis_table += f"</tbody></table><p class='mt-4'>Tokens utilizados en esta evaluación: {total_tokens_used}</p>"
+            structured_results.append({
+                "aspect": aspect,
+                "evaluation": evaluation,
+                "reason": reason
+            })
 
-        return analysis_table
+        return {
+            "results": structured_results,
+        }
     except Exception as e:
         return f"Error al analizar la transcripción con OpenAI: {e}"
