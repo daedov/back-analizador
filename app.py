@@ -1,28 +1,25 @@
-import os
-from flask import Flask, request, render_template, redirect, url_for, flash, jsonify
+from flask import Flask, request, jsonify
 from dotenv import load_dotenv
+from flask_cors import CORS
+from werkzeug.utils import secure_filename
 from services.transcription_service import transcribe_audio
 from services.analysis_service import analyze_transcription
-from models.database import db, Transcription  # Importar db y el modelo Transcription
-import shutil
-import time
+from models.database import db, Transcription
+import os
 
-# Cargar las variables desde el archivo .env
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app)
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.secret_key = 'tu_clave_secreta'  # Necesaria para mensajes flash
+app.secret_key = os.getenv('OPENAI_API_KEY')
 
 # Configuración de la base de datos usando MariaDB
 app.config['SQLALCHEMY_DATABASE_URI'] = (
     f"mysql+pymysql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}"
     f"@{os.getenv('DB_HOST')}/{os.getenv('DB_NAME')}"
 )
-
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# Inicializar la base de datos con la aplicación
 db.init_app(app)
 
 # Crear la base de datos
@@ -32,67 +29,62 @@ with app.app_context():
     except Exception as e:
         print(f"Error al crear la base de datos: {e}")
 
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/', methods=['GET'])
 def index():
-    if request.method == 'POST':
-        if 'files' not in request.files:
-            flash('No se ha seleccionado ningún archivo', 'error')
-            return redirect(request.url)
-
-        files = request.files.getlist('files')
-
-        if not files or all(f.filename == '' for f in files):
-            flash('No se ha seleccionado ningún archivo', 'error')
-            return redirect(request.url)
-
-        # Renderizar la vista de transición
-        return render_template('processing.html')
-
-    return render_template('index.html')
+    return jsonify({"message": "API está funcionando correctamente"})
 
 @app.route('/process', methods=['POST'])
 def process():
+    if 'files' not in request.files:
+        return jsonify({"error": "No se proporcionaron archivos"}), 400
+
     files = request.files.getlist('files')
+    if not files:
+        return jsonify({"error": "No se seleccionaron archivos"}), 400
+
     results = []
 
     for file in files:
         if file:
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(filepath)
 
             transcription = transcribe_audio(filepath)
             if not transcription:
-                flash(f'Hubo un problema al transcribir el archivo {file.filename}', 'error')
-                continue
+                return jsonify({"error": f"No se pudo transcribir el archivo {filename}"}), 400
 
-            # Guardar la transcripción en la base de datos
             try:
-                new_transcription = Transcription(filename=file.filename, text=transcription)
+                new_transcription = Transcription(filename=filename, text=transcription)
                 db.session.add(new_transcription)
                 db.session.commit()
             except Exception as e:
-                flash(f"Error al guardar en la base de datos: {e}", 'error')
-                continue
+                return jsonify({"error": f"Error al guardar en la base de datos: {e}"}), 500
 
-            analysis = analyze_transcription(transcription)
+            try:
+                analysis = analyze_transcription(transcription)
+            except Exception as e:
+                return jsonify({"error": f"Error al analizar la transcripción: {e}"}), 500
 
-            # Borrar la transcripción de la base de datos después del análisis
             try:
                 db.session.delete(new_transcription)
                 db.session.commit()
             except Exception as e:
-                flash(f"Error al borrar de la base de datos: {e}", 'error')
+                return jsonify({"error": f"Error al borrar de la base de datos: {e}"}), 500
 
-            # Añadir resultado al conjunto de resultados
-            results.append({'filename': file.filename, 'transcription': transcription, 'analysis': analysis})
-
-            # Borrar el archivo de audio después de procesarlo
             try:
                 os.remove(filepath)
             except Exception as e:
-                flash(f"Error al borrar el archivo de audio {file.filename}: {e}", 'error')
+                return jsonify({"error": f"Error al borrar el archivo {filename}: {e}"}), 500
 
-    return render_template('results.html', results=results)
+            results.append({
+                "filename": filename,
+                "transcription": transcription,
+                "analysis": analysis
+            })
+
+    # Devolver los resultados en el formato correcto
+    return jsonify({"results": results, "transcriptionExtract": "Extracto de la transcripción"})
 
 if __name__ == '__main__':
     if not os.path.exists(app.config['UPLOAD_FOLDER']):
