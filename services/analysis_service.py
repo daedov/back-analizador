@@ -8,17 +8,17 @@ def analyze_transcription(transcription):
     try:
         # Integración de prompts específicos para la evaluación de los audios, segmentados
         prompts = [
-            "Evalúa si el agente (que puede ser quien inicia o recibe la llamada) saluda y se presenta adecuadamente al comienzo de la transcripción de la siguiente grabación de una llamada telefónica. Ejemplos de un saludo adecuado incluyen: 'Hola, mi nombre es [nombre], ¿en qué puedo ayudarle hoy?' o 'Buenos días, soy [nombre] del departamento de soporte, ¿cómo puedo asistirle?'. Ten en cuenta que la pregunta sobre el problema puede surgir como parte del saludo o ser precedida por el cliente. Responde si es Positivo o Negativo y proporciona la razón con un fragmento de la conversación como ejemplo:",
-            "Verifica si el agente pregunta en qué puede ayudar al cliente durante el desarrollo de la llamada, ya sea que el agente esté iniciando la llamada o respondiendo a una consulta. Evalúa la transcripción de la siguiente grabación de una llamada telefónica y responde si es Positivo o Negativo, proporcionando la razón y un fragmento de la conversación como ejemplo. Si el cliente menciona el problema antes de que el agente pregunte, esto también es aceptable:",
-            "Evalúa si el agente utiliza palabras adecuadas y no emplea lenguaje inapropiado durante la llamada en la transcripción de la siguiente grabación de una llamada telefónica. Responde si es Positivo o Negativo y proporciona la razón con un fragmento de la conversación como ejemplo:",
-            "Determina si el agente demuestra seguridad en sus respuestas durante la interacción con el cliente según la transcripción de la siguiente grabación de una llamada telefónica. Responde si es Positivo o Negativo y proporciona la razón con un fragmento de la conversación como ejemplo:",
-            "Verifica si el agente se despide adecuadamente y pregunta si el cliente necesita algo más antes de finalizar la conversación, basado en la parte final de la transcripción de la siguiente grabación de una llamada telefónica. Ejemplos de una despedida adecuada incluyen: '¿Hay algo más en lo que pueda ayudarle antes de finalizar?' o 'Gracias por su tiempo, si necesita algo más, estamos aquí para ayudar'. También considera que si el cliente muestra prisa por finalizar la llamada, el agente podría no tener la oportunidad de preguntar, lo cual es aceptable. Responde si es Positivo o Negativo y proporciona la razón con un fragmento de la conversación como ejemplo:"
+            "Evalúa si el agente saluda y se presenta adecuadamente al comienzo de la llamada según la siguiente transcripción. Responde estrictamente con una de las siguientes opciones: 'Evaluación: Positivo' o 'Evaluación: Negativo', seguido de la razón y un fragmento de la conversación como ejemplo:",
+            "Verifica si el agente pregunta en qué puede ayudar al cliente durante la llamada según la siguiente transcripción. Responde estrictamente con una de las siguientes opciones: 'Evaluación: Positivo' o 'Evaluación: Negativo', seguido de la razón y un fragmento de la conversación como ejemplo:",
+            "Evalúa si el agente utiliza palabras adecuadas y no emplea lenguaje inapropiado durante la llamada según la siguiente transcripción. Responde estrictamente con una de las siguientes opciones: 'Evaluación: Positivo' o 'Evaluación: Negativo', seguido de la razón y un fragmento de la conversación como ejemplo:",
+            "Determina si el agente demuestra seguridad en sus respuestas durante la llamada según la siguiente transcripción. Responde estrictamente con una de las siguientes opciones: 'Evaluación: Positivo' o 'Evaluación: Negativo', seguido de la razón y un fragmento de la conversación como ejemplo:",
+            "Verifica si el agente se despide adecuadamente y pregunta si el cliente necesita algo más antes de finalizar la conversación según la siguiente transcripción. Responde estrictamente con una de las siguientes opciones: 'Evaluación: Positivo' o 'Evaluación: Negativo', seguido de la razón y un fragmento de la conversación como ejemplo:"
         ]
         analysis_results = []
 
         for prompt in prompts:
             response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
+                model="gpt-3.5-turbo",  # Para mejorar la calidad de evaluación model="gpt-4"
                 messages=[
                     {"role": "system", "content": "You are a helpful assistant."},
                     {"role": "user", "content": f"{prompt}\n\n{transcription}"}
@@ -39,14 +39,30 @@ def analyze_transcription(transcription):
 
         structured_results = []
         for aspect, result in zip(aspects, analysis_results):
-            # Divide el resultado en positivo/negativo y la razón proporcionada
+            # Post-procesamiento: asegurarnos de que la respuesta del modelo es consistente
             lines = result.split("\n", 1)
-            evaluation = lines[0] if len(lines) > 0 else "No evaluado"
-            reason = lines[1] if len(lines) > 1 else "Sin razón proporcionada"
+            evaluation = lines[0].strip().lower() if len(lines) > 0 else "no evaluado"
+            reason = lines[1].strip() if len(lines) > 1 else "Sin razón proporcionada"
+            
+            # Asegurar la consistencia: si es "positivo" entonces score = 1, si es "negativo" entonces score = 0
+            if "positivo" in evaluation:
+                score = 1
+                evaluation_text = "Positivo"
+            elif "negativo" in evaluation:
+                score = 0
+                evaluation_text = "Negativo"
+            else:
+                # Si la respuesta es ambigua o no clara, normalizamos como "No evaluado"
+                score = 0
+                evaluation_text = "No evaluado"
+                reason = "No se pudo determinar la evaluación claramente, revisión manual recomendada."
+            
+            # Añadir el resultado estructurado con evaluación, puntaje y razón
             structured_results.append({
                 "aspect": aspect,
-                "evaluation": evaluation,
-                "reason": reason
+                "evaluation": evaluation_text,
+                "reason": reason,
+                "score": score
             })
 
         return {
