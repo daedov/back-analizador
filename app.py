@@ -66,17 +66,7 @@ def process():
             except Exception as e:
                 return jsonify({"error": f"Error al analizar la transcripción: {e}"}), 500
 
-            try:
-                db.session.delete(new_transcription)
-                db.session.commit()
-            except Exception as e:
-                return jsonify({"error": f"Error al borrar de la base de datos: {e}"}), 500
-
-            try:
-                os.remove(filepath)
-            except Exception as e:
-                return jsonify({"error": f"Error al borrar el archivo {filename}: {e}"}), 500
-
+            # Guardar el análisis en la respuesta para ser usado en la evaluación general
             results.append({
                 "filename": filename,
                 "transcription": transcription,
@@ -85,6 +75,67 @@ def process():
 
     # Devolver los resultados en el formato correcto
     return jsonify({"results": results, "transcriptionExtract": "Extracto de la transcripción"})
+
+@app.route('/evaluate-general', methods=['POST'])
+def evaluate_general():
+    try:
+        # Recuperar todas las transcripciones y análisis que aún no han sido eliminados
+        transcriptions = Transcription.query.all()
+        if not transcriptions:
+            return jsonify({"error": "No hay análisis parciales disponibles para la evaluación general."}), 400
+
+        total_results = []
+        for transcription in transcriptions:
+            analysis = analyze_transcription(transcription.text)
+            total_results.append(analysis)
+
+        # Realizar la evaluación general basada en los análisis individuales
+        total_evaluations = []
+        aspect_summaries = {}
+
+        # Procesar todas las transcripciones
+        for result in total_results:
+            for item in result["results"]:
+                aspect = item["aspect"]
+                score = item["score"]
+
+                if aspect not in aspect_summaries:
+                    aspect_summaries[aspect] = {"total": 0, "positive": 0}
+
+                aspect_summaries[aspect]["total"] += 1
+                if score == 1:
+                    aspect_summaries[aspect]["positive"] += 1
+
+        # Calcular el cumplimiento porcentual por aspecto
+        aspect_compliance = []
+        for aspect, data in aspect_summaries.items():
+            compliance_percentage = (data["positive"] / data["total"]) * 100
+            aspect_compliance.append({
+                "aspect": aspect,
+                "compliancePercentage": compliance_percentage
+            })
+
+        # Calcular el promedio de cumplimiento general
+        overall_compliance = sum([item["compliancePercentage"] for item in aspect_compliance]) / len(aspect_compliance)
+
+        # Eliminar transcripciones y archivos después de la evaluación general
+        for transcription in transcriptions:
+            db.session.delete(transcription)
+            try:
+                os.remove(os.path.join(app.config['UPLOAD_FOLDER'], transcription.filename))
+            except Exception as e:
+                print(f"Error al borrar el archivo {transcription.filename}: {e}")
+
+        db.session.commit()
+
+        # Devolver la evaluación general
+        return jsonify({
+            "averagePercentage": overall_compliance,
+            "aspectResults": aspect_compliance
+        })
+
+    except Exception as e:
+        return jsonify({"error": f"Error al realizar la evaluación general: {e}"}), 500
 
 if __name__ == '__main__':
     if not os.path.exists(app.config['UPLOAD_FOLDER']):
