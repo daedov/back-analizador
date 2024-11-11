@@ -10,7 +10,7 @@ import os
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+CORS(app)  # Permitir todas las conexiones mientras trabajamos en local. Para producción, ajustar CORS.
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.secret_key = os.getenv('OPENAI_API_KEY')
 
@@ -50,50 +50,50 @@ def process():
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(filepath)
 
+            # Transcribir el archivo de audio
             transcription = transcribe_audio(filepath)
             if not transcription:
                 return jsonify({"error": f"No se pudo transcribir el archivo {filename}"}), 400
 
+            # Analizar la transcripción usando el servicio de análisis con GPT-3.5
             try:
-                new_transcription = Transcription(filename=filename, text=transcription)
-                db.session.add(new_transcription)
-                db.session.commit()
-            except Exception as e:
-                return jsonify({"error": f"Error al guardar en la base de datos: {e}"}), 500
-
-            try:
-                analysis = analyze_transcription(transcription)
+                analysis = analyze_transcription(transcription, model_version='gpt-3.5-turbo')
             except Exception as e:
                 return jsonify({"error": f"Error al analizar la transcripción: {e}"}), 500
 
-            # Guardar el análisis en la respuesta para ser usado en la evaluación general
+            # Añadir el análisis al resultado que se devolverá al cliente
             results.append({
                 "filename": filename,
                 "transcription": transcription,
                 "analysis": analysis
             })
 
-    # Devolver los resultados en el formato correcto
+            # Después de guardar los resultados parciales, borrar las transcripciones y los archivos
+            try:
+                os.remove(filepath)
+            except Exception as e:
+                return jsonify({"error": f"Error al borrar el archivo {filename}: {e}"}), 500
+
+    # Devolver los resultados del análisis parcial
     return jsonify({"results": results, "transcriptionExtract": "Extracto de la transcripción"})
 
 @app.route('/evaluate-general', methods=['POST'])
 def evaluate_general():
     try:
-        # Recuperar todas las transcripciones y análisis que aún no han sido eliminados
-        transcriptions = Transcription.query.all()
-        if not transcriptions:
-            return jsonify({"error": "No hay análisis parciales disponibles para la evaluación general."}), 400
+        # Recuperar las evaluaciones parciales proporcionadas en el cuerpo de la solicitud
+        total_evaluations = request.json.get("results")
+        if not total_evaluations:
+            return jsonify({"error": "No hay evaluaciones parciales disponibles para la evaluación general."}), 400
 
+        # Procesar las evaluaciones parciales para generar la evaluación general usando GPT-4
         total_results = []
-        for transcription in transcriptions:
-            analysis = analyze_transcription(transcription.text)
+        for result in total_evaluations:
+            # Usar GPT-4 para procesar cada transcripción
+            analysis = analyze_transcription(result["transcription"], model_version='gpt-4')
             total_results.append(analysis)
 
-        # Realizar la evaluación general basada en los análisis individuales
-        total_evaluations = []
+        # Procesar los análisis para generar la evaluación general
         aspect_summaries = {}
-
-        # Procesar todas las transcripciones
         for result in total_results:
             for item in result["results"]:
                 aspect = item["aspect"]
@@ -117,16 +117,6 @@ def evaluate_general():
 
         # Calcular el promedio de cumplimiento general
         overall_compliance = sum([item["compliancePercentage"] for item in aspect_compliance]) / len(aspect_compliance)
-
-        # Eliminar transcripciones y archivos después de la evaluación general
-        for transcription in transcriptions:
-            db.session.delete(transcription)
-            try:
-                os.remove(os.path.join(app.config['UPLOAD_FOLDER'], transcription.filename))
-            except Exception as e:
-                print(f"Error al borrar el archivo {transcription.filename}: {e}")
-
-        db.session.commit()
 
         # Devolver la evaluación general
         return jsonify({
