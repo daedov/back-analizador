@@ -1,14 +1,15 @@
-import speech_recognition as sr
+import openai
+import os
+
+# Acceder a la API key desde la variable de entorno
+openai.api_key = os.getenv('OPENAI_API_KEY')
 
 def transcribe_audio(filepath):
-    recognizer = sr.Recognizer()
-    with sr.AudioFile(filepath) as source:
-        audio = recognizer.record(source)
-
     try:
-        text = recognizer.recognize_google(audio, language='es-ES')
-        return text
-    except sr.UnknownValueError:
-        return "No se pudo entender el audio"
-    except sr.RequestError as e:
-        return f"Error en el servicio de reconocimiento de voz; {e}"
+        # Utilizar Whisper API de OpenAI
+        with open(filepath, "rb") as audio_file:
+            response = openai.Audio.transcribe("whisper-1", audio_file)
+        return response["text"]
+    except Exception as e:
+        return f"Error al transcribir el audio con Whisper: {e}"
+
