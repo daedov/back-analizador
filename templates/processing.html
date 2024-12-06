@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>En Proceso</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.0.0/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="min-h-screen flex items-center justify-center bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-md w-full bg-white p-12 rounded-lg shadow-md text-center">
+            <h1 class="text-3xl font-bold text-gray-800">Procesando los archivos...</h1>
+            <p class="text-gray-600 mt-4">Por favor espera mientras analizamos los audios.</p>
+            <div class="mt-8">
+                <div class="loader border-t-4 border-blue-600 rounded-full w-16 h-16 mx-auto animate-spin"></div>
+            </div>
+        </div>
+    </div>
+    <style>
+        .loader {
+            border-width: 4px;
+            border-top-color: #3490dc;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</body>
+</html>

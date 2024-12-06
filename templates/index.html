@@ -1,23 +1,100 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Transcripción y Análisis de Audio</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.0.0/dist/tailwind.min.css" rel="stylesheet">
+    <title>Transcripción</title>
+    <script>
+        function submitForm(event) {
+            event.preventDefault(); // Prevenir el envío normal del formulario
+            document.getElementById('processing-message').style.display = 'block'; // Mostrar el mensaje de procesamiento
+            document.getElementById('progress-container').style.display = 'block'; // Mostrar la barra de progreso
+            document.getElementById('upload-form').style.display = 'none'; // Ocultar el formulario de carga
+
+            setTimeout(function () {
+                startProgressBar(); // Iniciar la barra de progreso
+                document.getElementById('upload-form').submit(); // Enviar el formulario
+            }, 500);
+        }
+
+        function startProgressBar() {
+            let progressBar = document.getElementById("progress-bar");
+            let progress = 0;
+
+            const interval = setInterval(function () {
+                if (progress < 100) {
+                    progress += Math.random() * 10; // Incremento aleatorio para simular progreso
+                    progressBar.style.width = progress + "%";
+                    progressBar.innerHTML = Math.round(progress) + "%";
+                } else {
+                    clearInterval(interval); // Detener cuando llega al 100%
+                }
+            }, 1000); // Actualizar cada 1 segundo
+        }
+    </script>
 </head>
+
 <body>
-    <h1>Sube un archivo de audio para transcribir y analizar</h1>
-    <form method="POST" enctype="multipart/form-data">
-        <input type="file" name="file" accept="audio/*">
-        <input type="submit" value="Subir y Analizar">
-    </form>
+    <div class="min-h-screen flex items-center justify-center bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-4xl w-full bg-white p-12 rounded-lg shadow-md">
+            <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">Sube archivos de audio para transcribir y analizar</h1>
 
-    {% if transcription %}
-        <h2>Transcripción:</h2>
-        <p>{{ transcription }}</p>
+            <!-- Formulario modificado con JavaScript -->
+            <form id="upload-form" method="POST" action="/process" enctype="multipart/form-data" class="space-y-8" onsubmit="submitForm(event)">
+                <div>
+                    <label class="block text-lg font-medium text-gray-700" for="file">Archivos de audio</label>
+                    <input type="file" name="files" accept="audio/*" multiple
+                        class="mt-2 block w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-lg">
+                </div>
+                <div>
+                    <input type="submit" value="Subir y Analizar"
+                        class="w-full flex justify-center py-3 px-5 border border-transparent rounded-md shadow-sm text-lg font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                </div>
+            </form>
 
-        <h2>Análisis:</h2>
-        <p>{{ analysis }}</p>
-    {% endif %}
+            <!-- Mensaje de procesamiento -->
+            <div id="processing-message" style="display: none;" class="text-center mt-8">
+                <p class="text-2xl font-bold text-gray-800">Procesando los archivos, por favor espera...</p>
+            </div>
+
+            <!-- Barra de progreso -->
+            <div id="progress-container" style="display: none;" class="mt-8">
+                <div class="w-full bg-gray-200 rounded-full h-8 overflow-hidden">
+                    <div id="progress-bar" class="bg-blue-600 text-white text-center h-full" style="width: 0%;">0%</div>
+                </div>
+            </div>
+
+            <style>
+                .loader {
+                    border-width: 4px;
+                    border-top-color: #3490dc;
+                    animation: spin 1s linear infinite;
+                }
+
+                @keyframes spin {
+                    to {
+                        transform: rotate(360deg);
+                    }
+                }
+            </style>
+
+            {% if results %}
+            <div class="mt-8">
+                {% for result in results %}
+                <div class="mt-8">
+                    <h2 class="text-2xl font-semibold text-gray-800">Transcripción del archivo {{ result.filename }}:</h2>
+                    <p class="mt-4 text-gray-700">{{ result.transcription }}</p>
+                    <h3 class="text-2xl font-semibold text-gray-800 mt-4">Análisis:</h3>
+                    <div class="mt-4 text-gray-700">{{ result.analysis | safe }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
 </body>
+
 </html>
+
