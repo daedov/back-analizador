@@ -4,7 +4,7 @@ import os
 # Acceder a la API key desde la variable de entorno
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
-def analyze_transcription(transcription, model_version='gpt-3.5-turbo'):
+def analyze_transcription(transcription, model_version='gpt-4'):
     try:
         # Prompts divididos entre errores Críticos y no Críticos
         critical_prompts = [

@@ -35,7 +35,7 @@ def evaluate_general():
 
         for transcription in transcriptions:
             # Aquí usamos GPT-3.5 específicamente para la evaluación general
-            analysis = analyze_transcription(transcription.text, model_version='gpt-3.5-turbo')
+            analysis = analyze_transcription(transcription.text, model_version='gpt-4o')
             total_evaluations.append(analysis)
 
         # Procesar los análisis para generar la evaluación general

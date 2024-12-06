@@ -11,7 +11,7 @@ import os
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)  # Permitir todas las conexiones mientras trabajamos en local.
+CORS(app, resources={r"/*": {"origins": "*"}})
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.secret_key = os.getenv('OPENAI_API_KEY')
 
@@ -22,6 +22,12 @@ app.config['SQLALCHEMY_DATABASE_URI'] = (
 )
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
+
+# Middleware para registrar solicitudes
+@app.before_request
+def log_request():
+    print(f"Request data: {request.data}")
+    print(f"Request headers: {request.headers}")
 
 # Crear la base de datos
 with app.app_context():
