@@ -10,7 +10,7 @@ import os
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)  # Permitir todas las conexiones mientras trabajamos en local. Para producción, ajustar CORS.
+CORS(app, resources={r"/*": {"origins": "*"}})
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.secret_key = os.getenv('OPENAI_API_KEY')
 
@@ -21,6 +21,12 @@ app.config['SQLALCHEMY_DATABASE_URI'] = (
 )
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
+
+# Middleware para registrar solicitudes
+@app.before_request
+def log_request():
+    print(f"Request data: {request.data}")
+    print(f"Request headers: {request.headers}")
 
 # Crear la base de datos
 with app.app_context():
@@ -79,6 +85,7 @@ def process():
 
 @app.route('/evaluate-general', methods=['POST'])
 def evaluate_general():
+    print("Contenido de la solicitud:", request.json)  # Registro de depuración
     try:
         # Recuperar las evaluaciones parciales proporcionadas en el cuerpo de la solicitud
         total_evaluations = request.json.get("results")
